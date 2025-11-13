@@ -2,28 +2,24 @@ using UnityEngine;
 
 public class UI : MonoBehaviour
 {
-    public void PlaySound()
+
+    [SerializeField] GameObject MainMenu;
+    [SerializeField] GameObject CalibrationMenu;
+
+    private void Awake()
     {
-        if (AudioWaves.instance.wave != null)
-        {
-            AudioWaves.instance.audioSource.clip = AudioWaves.instance.wave;
-            AudioWaves.instance.audioSource.Play();
-        }
-        else
-        {
-            Debug.LogError("Clip Isn't Created");
-        }
+        StaticDataAndHelpers.Init();
     }
 
-    public void StopSound()
+    public void CalibrateMenu()
     {
-        if (AudioWaves.instance.audioSource.isPlaying)
-        {
-            AudioWaves.instance.audioSource.Stop();
-        }
-        else
-        {
-            Debug.LogError("Sound isn't Playing right now");
-        }
+        MainMenu.SetActive(false);
+        CalibrationMenu.SetActive(true);
+    }
+
+    public void CalibrateBackBTN()
+    {
+        MainMenu.SetActive(true);
+        CalibrationMenu.SetActive(false);
     }
 }
