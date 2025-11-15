@@ -17,19 +17,21 @@ public class AudiometryTest : MonoBehaviour
     public Button noResponseButton;
     public TMP_Text statusText;
 
-    // --- UPDATED ---
-    // These will store the results for each ear
     private Dictionary<float, int> audiogramResultsLeft = new Dictionary<float, int>();
     private Dictionary<float, int> audiogramResultsRight = new Dictionary<float, int>();
-    private TestEar currentEar = TestEar.Left; // Start with the left ear
+    private TestEar currentEar = TestEar.Left;
 
     private Dictionary<float, float> calibrationData;
     private int currentFreqIndex = 0;
     private int currentTestHL = 20;
-    private int ascendingResponses = 0;
     private bool isWaitingForResponse = false;
     private Coroutine responseTimer;
     private float[] frequenciesToTest = { 1000, 2000, 4000, 8000, 500, 250 };
+    private int maxTestHL = 100;
+
+    // --- NEW ---
+    // This flag will be set to true by OnUserHeard() to break the loop.
+    private bool isFrequencyDone = false;
 
     void OnEnable()
     {
@@ -44,7 +46,6 @@ public class AudiometryTest : MonoBehaviour
         heardButton.onClick.AddListener(OnUserHeard);
         noResponseButton.onClick.AddListener(OnUserDidNotHear);
 
-        // Start the test coroutine
         StartCoroutine(RunFullTestBattery());
     }
 
@@ -56,21 +57,19 @@ public class AudiometryTest : MonoBehaviour
         if (noResponseButton != null) noResponseButton.onClick.RemoveListener(OnUserDidNotHear);
     }
 
-    // --- NEW ---
-    // This coroutine manages the entire test battery (Left ear, then Right ear)
     IEnumerator RunFullTestBattery()
     {
         // 1. TEST LEFT EAR
         currentEar = TestEar.Left;
-        toneGenerator.pan = -1.0f; // Pan hard left
+        toneGenerator.pan = -1.0f;
         audiogramResultsLeft.Clear();
         statusText.text = "Testing: LEFT EAR";
-        yield return new WaitForSeconds(2.0f); // Give user time to read
+        yield return new WaitForSeconds(2.0f);
         yield return StartCoroutine(RunTestForCurrentEar());
 
         // 2. TEST RIGHT EAR
         currentEar = TestEar.Right;
-        toneGenerator.pan = 1.0f; // Pan hard right
+        toneGenerator.pan = 1.0f;
         audiogramResultsRight.Clear();
         statusText.text = "Testing: RIGHT EAR";
         yield return new WaitForSeconds(2.0f);
@@ -81,7 +80,8 @@ public class AudiometryTest : MonoBehaviour
         FinishTest();
     }
 
-    // This is the main test loop, now for whichever ear is 'currentEar'
+    // --- LOGIC UPDATED ---
+    // This loop now only breaks when isFrequencyDone = true
     IEnumerator RunTestForCurrentEar()
     {
         for (currentFreqIndex = 0; currentFreqIndex < frequenciesToTest.Length; currentFreqIndex++)
@@ -91,23 +91,33 @@ public class AudiometryTest : MonoBehaviour
 
             if (!calibrationData.ContainsKey(freq) || float.IsPositiveInfinity(calibrationData[freq]))
             {
-                RecordResult(-1); // -1 means "NR"
+                RecordResult(-1);
                 continue;
             }
 
             currentTestHL = 20;
-            ascendingResponses = 0;
+            isFrequencyDone = false; // Reset the flag for the new frequency
 
-            while (true)
+            while (!isFrequencyDone) // Loop until "Heard" is pressed
             {
                 float zero_dB_HL = calibrationData[freq];
                 float testLevel_dBFS = zero_dB_HL + currentTestHL;
 
+                // Check 1: Clinical limit
+                if (currentTestHL > maxTestHL)
+                {
+                    RecordResult(-1);
+                    isFrequencyDone = true; // Break the loop
+                    continue; // Skip the rest of this loop iteration
+                }
+
+                // Check 2: Physical limit
                 if (testLevel_dBFS > 0)
                 {
                     testLevel_dBFS = 0;
                     RecordResult(-1);
-                    break;
+                    isFrequencyDone = true; // Break the loop
+                    continue; // Skip the rest of this loop iteration
                 }
 
                 toneGenerator.frequency = freq;
@@ -121,17 +131,12 @@ public class AudiometryTest : MonoBehaviour
                 responseTimer = StartCoroutine(ResponseTimer());
                 while (isWaitingForResponse) { yield return null; }
 
-                if (ascendingResponses >= 2)
-                {
-                    RecordResult(currentTestHL);
-                    break;
-                }
+                // The loop will now repeat at a new HL if "No Response" was pressed,
+                // or it will exit if "Heard" was pressed (isFrequencyDone = true)
             }
         }
     }
 
-    // --- NEW HELPER ---
-    // Records the result to the correct ear's dictionary
     void RecordResult(int threshold)
     {
         float freq = frequenciesToTest[currentFreqIndex];
@@ -151,17 +156,22 @@ public class AudiometryTest : MonoBehaviour
         if (isWaitingForResponse)
         {
             isWaitingForResponse = false;
-            OnUserMissed();
+            OnUserMissed(); // Treat timer running out as "No Response"
         }
     }
 
+    // --- LOGIC UPDATED ---
     void OnUserHeard()
     {
         if (!isWaitingForResponse) return;
         isWaitingForResponse = false;
         StopCoroutine(responseTimer);
-        ascendingResponses++;
-        currentTestHL -= 10;
+
+        // 1. Record the threshold at the *current* level
+        RecordResult(currentTestHL);
+
+        // 2. Set the flag to true to break the 'while' loop
+        isFrequencyDone = true;
     }
 
     public void OnUserDidNotHear()
@@ -169,12 +179,15 @@ public class AudiometryTest : MonoBehaviour
         if (!isWaitingForResponse) return;
         isWaitingForResponse = false;
         StopCoroutine(responseTimer);
+
         OnUserMissed();
     }
 
+    // --- LOGIC UPDATED ---
     void OnUserMissed()
     {
-        ascendingResponses = 0;
+        // "No Response" simply increases the level for the next loop.
+        // It no longer resets any counters.
         currentTestHL += 5;
     }
 
@@ -182,9 +195,8 @@ public class AudiometryTest : MonoBehaviour
     {
         Debug.Log("--- TEST COMPLETE ---");
         statusText.text = "Test Complete!";
-        toneGenerator.pan = 0f; // Reset pan to center
+        toneGenerator.pan = 0f;
 
-        // Save both results dictionaries
         StaticDataAndHelpers.audiogramResultsLeft = this.audiogramResultsLeft;
         StaticDataAndHelpers.audiogramResultsRight = this.audiogramResultsRight;
 

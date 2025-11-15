@@ -6,7 +6,6 @@ using System.Text;
 using System.IO;
 using System;
 
-// (RiskFactor class definition remains the same)
 public class RiskFactor
 {
     public string factor;
@@ -49,6 +48,9 @@ public class ResultsManager : MonoBehaviour
     private float averageThreshold = 0;
     private List<RiskFactor> currentRisks = new List<RiskFactor>();
     private List<string> currentRecs = new List<string>();
+
+    // This MUST match the maxTestHL in AudiometryTest.cs
+    private int maxTestHL = 100;
 
 
     void Start()
@@ -103,6 +105,7 @@ public class ResultsManager : MonoBehaviour
         if (downloadStatusText != null) { downloadStatusText.text = ""; }
     }
 
+    // --- THIS FUNCTION CONTAINS THE BUG FIX ---
     float CalculateAverageThreshold()
     {
         float total = 0;
@@ -111,18 +114,36 @@ public class ResultsManager : MonoBehaviour
         // Average LEFT ear
         foreach (var freq in frequencies)
         {
-            if (resultsLeft.ContainsKey(freq) && resultsLeft[freq] != -1)
+            if (resultsLeft.ContainsKey(freq))
             {
-                total += resultsLeft[freq];
+                if (resultsLeft[freq] == -1)
+                {
+                    // "No Response" counts as the max testable volume
+                    total += maxTestHL;
+                }
+                else
+                {
+                    // Valid threshold found
+                    total += resultsLeft[freq];
+                }
                 count++;
             }
         }
         // Average RIGHT ear
         foreach (var freq in frequencies)
         {
-            if (resultsRight.ContainsKey(freq) && resultsRight[freq] != -1)
+            if (resultsRight.ContainsKey(freq))
             {
-                total += resultsRight[freq];
+                if (resultsRight[freq] == -1)
+                {
+                    // "No Response" counts as the max testable volume
+                    total += maxTestHL;
+                }
+                else
+                {
+                    // Valid threshold found
+                    total += resultsRight[freq];
+                }
                 count++;
             }
         }
@@ -130,7 +151,6 @@ public class ResultsManager : MonoBehaviour
         return (count == 0) ? 0 : (total / count);
     }
 
-    // --- UPDATED ---
     // This function now plots one set of dots at a time
     void PlotAudiogram(Dictionary<float, int> results, List<RectTransform> dots)
     {
@@ -152,7 +172,7 @@ public class ResultsManager : MonoBehaviour
                 float dbValue = results[freq];
                 float y_percent = 1.0f - Mathf.InverseLerp(minDB, maxDB, dbValue);
 
-                // --- This calculation is improved for center pivot ---
+                // This calculation is improved for center pivot
                 float y_pos = (y_percent - 0.5f) * chartHeight;
 
                 dots[i].anchoredPosition = new Vector2(dots[i].anchoredPosition.x, y_pos);
@@ -160,58 +180,18 @@ public class ResultsManager : MonoBehaviour
             }
             else
             {
+                // Hide the dot if result is -1 (No Response)
                 dots[i].gameObject.SetActive(false);
             }
         }
     }
 
-    // --- UPDATED ---
-    // Added L/R results to the report
-    private string BuildReportString()
-    {
-        StringBuilder report = new StringBuilder();
-        string divider = "???????????????????????????????????????????????????????\n";
-
-        // (Patient Info remains the same)
-        // ...
-
-        report.AppendLine("\nDETAILED AUDIOGRAM DATA");
-        report.AppendLine("???????????????????????????????????????????????????????");
-
-        report.AppendLine("\nLEFT EAR:");
-        foreach (float freq in frequencies)
-        {
-            string thresholdStr = "No Response";
-            if (resultsLeft.ContainsKey(freq) && resultsLeft[freq] != -1)
-                thresholdStr = $"{resultsLeft[freq]} dB HL";
-            report.AppendLine($"  {freq} Hz: {thresholdStr}");
-        }
-
-        report.AppendLine("\nRIGHT EAR:");
-        foreach (float freq in frequencies)
-        {
-            string thresholdStr = "No Response";
-            if (resultsRight.ContainsKey(freq) && resultsRight[freq] != -1)
-                thresholdStr = $"{resultsRight[freq]} dB HL";
-            report.AppendLine($"  {freq} Hz: {thresholdStr}");
-        }
-
-        // (Rest of the report: Risks, Recs, Notice... remains the same)
-        // ...
-
-        return report.ToString();
-    }
-
-    // --- (All calculation functions: PlotAudiogram, CalculateAverageThreshold, etc. remain the same) ---
-    // (Omitted for brevity, paste them in from the previous answer)
-
-    // --- NEW FUNCTION ---
     // This is called by the `downloadReportButton`
     public void OnDownloadReport()
     {
         Debug.Log("Generating report...");
 
-        // 1. Build the report string (matches Results.tsx)
+        // 1. Build the report string
         string report = BuildReportString();
 
         // 2. Define a file path
@@ -240,13 +220,85 @@ public class ResultsManager : MonoBehaviour
         }
     }
 
+    // Added L/R results to the report
+    private string BuildReportString()
+    {
+        StringBuilder report = new StringBuilder();
+        string divider = "???????????????????????????????????????????????????????\n";
+
+        report.AppendLine(divider);
+        report.AppendLine("HEARING TEST REPORT");
+        report.AppendLine(divider);
+        report.AppendLine("\nPATIENT INFORMATION");
+        report.AppendLine("???????????????????????????????????????????????????????");
+        report.AppendLine($"Name:           {history.name}");
+        report.AppendLine($"Age:            {history.age}");
+        report.AppendLine($"Gender:         {history.gender}");
+        report.AppendLine($"Test Date:      {DateTime.Now:MMMM dd, yyyy}");
+        report.AppendLine($"\n{divider}");
+        report.AppendLine("TEST RESULTS SUMMARY");
+        report.AppendLine(divider);
+        report.AppendLine($"Hearing Status:       {hearingStatus}");
+        report.AppendLine($"Average Threshold:    {averageThreshold:F1} dB HL\n");
+
+        report.AppendLine("\nDETAILED AUDIOGRAM DATA");
+        report.AppendLine("???????????????????????????????????????????????????????");
+
+        report.AppendLine("\nLEFT EAR:");
+        foreach (float freq in frequencies)
+        {
+            string thresholdStr = "No Response";
+            if (resultsLeft.ContainsKey(freq) && resultsLeft[freq] != -1)
+                thresholdStr = $"{resultsLeft[freq]} dB HL";
+            report.AppendLine($"  {freq} Hz: {thresholdStr}");
+        }
+
+        report.AppendLine("\nRIGHT EAR:");
+        foreach (float freq in frequencies)
+        {
+            string thresholdStr = "No Response";
+            if (resultsRight.ContainsKey(freq) && resultsRight[freq] != -1)
+                thresholdStr = $"{resultsRight[freq]} dB HL";
+            report.AppendLine($"  {freq} Hz: {thresholdStr}");
+        }
+
+        if (currentRisks.Count > 0)
+        {
+            report.AppendLine($"\n{divider}");
+            report.AppendLine("IDENTIFIED RISK FACTORS");
+            report.AppendLine(divider);
+            foreach (var risk in currentRisks)
+            {
+                report.AppendLine($"• [{risk.severity.ToUpper()}] {risk.factor}");
+                report.AppendLine($"   <i>{risk.description}</i>\n");
+            }
+        }
+
+        if (currentRecs.Count > 0)
+        {
+            report.AppendLine($"\n{divider}");
+            report.AppendLine("PERSONALIZED RECOMMENDATIONS");
+            report.AppendLine(divider);
+            foreach (var rec in currentRecs)
+            {
+                report.AppendLine($"• {rec}");
+            }
+        }
+
+        report.AppendLine($"\n{divider}");
+        report.AppendLine("IMPORTANT NOTICE");
+        report.AppendLine(divider);
+        report.AppendLine("This is a screening test and not a substitute for a professional audiological evaluation.");
+
+        return report.ToString();
+    }
+
     string GetHearingStatus(float avg)
     {
         if (avg < 25) return "NORMAL";
         if (avg < 40) return "MILD LOSS";
         if (avg < 60) return "MODERATE LOSS";
         return "SIGNIFICANT LOSS";
-        // You can set hearingStatusText.color here too
     }
 
     List<RiskFactor> GetRiskFactors()
