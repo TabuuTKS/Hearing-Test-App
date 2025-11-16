@@ -105,8 +105,8 @@ public class HearingTestManager : MonoBehaviour
         toneGenerator.frequency = freq;
 
         // Set the slider to a default starting position (e.g., -20 dB)
-        calibrationSlider.value = -20f;
-        toneGenerator.gain = -20f;
+        calibrationSlider.value = -60f;
+        toneGenerator.gain = -60f;
 
         // **This is the fix for your 'sound starts randomly' problem**
         // We only play the sound when we are ready to calibrate.

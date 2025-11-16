@@ -1,7 +1,6 @@
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
-using System.Collections.Generic;
 
 public class QuestionnaireManager : MonoBehaviour
 {
@@ -17,6 +16,7 @@ public class QuestionnaireManager : MonoBehaviour
     public Toggle occupationalNoiseToggle;
     public Toggle recreationalNoiseToggle;
     public Toggle militaryNoiseToggle;
+    public TMP_Text DurationOfExposureText;
     public TMP_Dropdown noiseDurationDropdown; // Options: <1, 1-5, 5-10, 10+
 
     [Header("Step 3: Medical History")]
@@ -36,6 +36,7 @@ public class QuestionnaireManager : MonoBehaviour
 
     [Header("Step 5: Symptoms")]
     public Toggle tinnitusToggle;
+    public TMP_Text tinnitusFrequencyText;
     public TMP_Dropdown tinnitusFrequencyDropdown; // Options: rarely, occasionally...
     public Toggle dizzinessToggle;
     public Toggle earPainToggle;
@@ -44,6 +45,42 @@ public class QuestionnaireManager : MonoBehaviour
     public Toggle hearingAidUseToggle;
 
     // This is called by the "Complete & Continue" button
+
+
+    [Header("Steps Manager")]
+    [SerializeField] GameObject[] Steps;
+    [SerializeField] Button PreviousBTN;
+    [SerializeField] Button NextBTN;
+    [SerializeField] Button ContinueBTN;
+    private int StepsArrayIndex = 0;
+
+    private void Start()
+    {
+        if (StepsArrayIndex == 0)
+        {
+            Steps[0].SetActive(true);
+            Steps[1].SetActive(false);
+            Steps[2].SetActive(false);
+            Steps[3].SetActive(false);
+            Steps[4].SetActive(false);
+        }
+
+        else if (StepsArrayIndex == 4)
+        {
+            Steps[0].SetActive(false);
+            Steps[1].SetActive(false);
+            Steps[2].SetActive(false);
+            Steps[3].SetActive(false);
+            Steps[4].SetActive(true);
+        }
+        
+    }
+
+    private void Update()
+    {
+        QuestionaireFormWorking();
+    }
+
     public void OnContinueButton()
     {
         // 1. Get the static patientHistory object
@@ -97,6 +134,49 @@ public class QuestionnaireManager : MonoBehaviour
         else
         {
             Debug.LogError("UIManager not set on QuestionnaireManager!");
+        }
+    }
+
+    public void PreviousBTNFunc()
+    {
+        if (StepsArrayIndex > 0)
+        {
+            Steps[StepsArrayIndex].SetActive(false);
+            StepsArrayIndex--;
+            Steps[StepsArrayIndex].SetActive(true);
+        }
+    }
+
+    public void NextBTNFunc()
+    {
+        if (StepsArrayIndex < 5)
+        {
+            Steps[StepsArrayIndex].SetActive(false);
+            StepsArrayIndex++;
+            Steps[StepsArrayIndex].SetActive(true);
+        }
+    }
+
+    private void QuestionaireFormWorking()
+    {
+        //Steps Manager
+        PreviousBTN.interactable = !(StepsArrayIndex == 0);
+        NextBTN.interactable = !(StepsArrayIndex == 4);
+        ContinueBTN.gameObject.SetActive(StepsArrayIndex == 4);
+
+        //Step 2
+        if (StepsArrayIndex == 1)
+        {
+            noiseDurationDropdown.gameObject.SetActive((occupationalNoiseToggle.isOn || recreationalNoiseToggle.isOn || militaryNoiseToggle.isOn));
+            DurationOfExposureText.gameObject.SetActive((occupationalNoiseToggle.isOn || recreationalNoiseToggle.isOn || militaryNoiseToggle.isOn));
+        }
+
+        //Step5
+
+        if (StepsArrayIndex == 4)
+        {
+            tinnitusFrequencyText.gameObject.SetActive(tinnitusToggle.isOn);
+            tinnitusFrequencyDropdown.gameObject.SetActive(tinnitusToggle.isOn);
         }
     }
 }
