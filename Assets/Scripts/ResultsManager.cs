@@ -229,7 +229,29 @@ public class ResultsManager : MonoBehaviour
 
         string report = BuildReportString();
         string fileName = $"Hearing_Test_{history.name.Replace(" ", "_")}_{DateTime.Now:yyyy-MM-dd}.txt";
-        string filePath = Path.Combine(Application.persistentDataPath, fileName);
+
+
+        string basePath;
+
+        #if UNITY_EDITOR
+        // 1. In Editor -> Use persistentDataPath
+        basePath = Application.persistentDataPath;
+
+        #elif UNITY_STANDALONE_WIN
+        // 2. Windows Build -> Folder where the EXE is
+        basePath = Directory.GetParent(Application.dataPath).FullName;
+
+        #elif UNITY_ANDROID
+        // 3. Android -> internal storage path
+        basePath = Path.Combine("/storage/emulated/0", "HumanAuditoryAcuityAssessment");
+
+        #else
+        // fallback
+        basePath = Application.persistentDataPath;
+        #endif
+
+        // Final path:
+        string filePath = Path.Combine(basePath, fileName);
 
         try
         {
