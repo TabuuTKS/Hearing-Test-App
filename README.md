@@ -123,7 +123,7 @@
         
    <section class="mt-8">
             <h2 class="text-2xl font-semibold text-gray-900 mb-4">🖥️ Application Workflow & Screenshots</h2>
-            <p class="mb-4 text-gray-600"><em>(<strong>Note:</strong> Please replace the placeholder blocks below with your own application <code>&lt;img&gt;</code> tags!)</em></p>
+           
             
    <ol class="list-decimal list-outside space-y-6 ml-5">
                 <li>
